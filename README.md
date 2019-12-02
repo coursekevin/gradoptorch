@@ -17,5 +17,5 @@ Note that this toolbox is meant for prototyping and built-in PyTorch optimizers 
 
 ## Setup
 ```bash
-pip install git+https://github.com/coursekevin/mpbatch.git
+pip install git+https://github.com/coursekevin/gradoptorch.git
 ```
