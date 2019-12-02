@@ -14,3 +14,8 @@ Note that this toolbox is meant for prototyping and built-in PyTorch optimizers 
     'back_tracking' : backing tracking based line-search
     'quad_search' : quadratic line-search
     'constant' : no line search, constant step size used
+
+## Setup
+```bash
+pip install git+https://github.com/coursekevin/mpbatch.git
+```
