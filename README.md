@@ -1,6 +1,8 @@
 # gradoptorch
 Gradient based optimizers for python with a PyTorch backend. This package intends to allow more fine-grain control of optimizers without getting lost in the PyTorch high-level API.
 
+Note that this toolbox is meant for prototyping and built-in PyTorch optimizers will almost certainly have better performance.
+
 ## Included optimizers:
     'grad_exact' : exact gradient optimization
     'conj_grad_fr' : conjugate gradient descent using Fletcher-Reeves search direction
