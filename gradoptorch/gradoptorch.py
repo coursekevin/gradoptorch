@@ -1,12 +1,6 @@
 import torch
 from .lstorch import line_search
 
-# temporary imports (TODO:: MOVE EXAMPLES TO SEPERATE FILE)
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.gridspec import GridSpec
-import numpy as np
-
 
 def gradoptorch(f, g, x_guess, opt_method='grad_exact', opt_params={'ep_g': 1e-8, 'ep_a': 1e-6, 'ep_r': 1e-2, 'iter_lim': 1000}, ls_method='back_tracking', ls_params={'rho': 0.3, 'mu': 1e-4,  'iter_lim': 1000}):
     """
