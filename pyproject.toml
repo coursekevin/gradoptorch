@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "gradoptorch"
+version = "0.1.0"
+description = "Classical gradient based optimization in PyTorch"
+authors = ["Kevin Course <kevin.course@mail.utoronto.ca>"]
+license = "GNUv3"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = "^2.1.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
