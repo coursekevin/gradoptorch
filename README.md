@@ -12,14 +12,14 @@
 ## What is GradOpTorch?
 
 GradOpTorch is a suite of classical gradient-based optimization tools for
-PyTorch. The toolkit includes conjugate gradients, BFGS, and some 
+PyTorch. The toolkit includes conjugate gradients, BFGS, and some
 methods for line-search.
 
 ## Why not [torch.optim](https://pytorch.org/docs/stable/optim.html)?
 
-Not every problem is high-dimensional with noisy gradients.  
-For such problems, classical optimization techniques 
-can be more appropriate.
+Not every problem is high-dimensional, nonlinear, with noisy gradients.  
+For such problems, classical optimization techniques
+can be more efficient.
 
 ## Installation
 
@@ -30,6 +30,40 @@ pip install gradoptorch
 ```
 
 ## Usage
+
+There are two primary interfaces for making use of the library.
+
+1. The standard PyTorch object oriented interface:
+
+```python
+from gradoptorch import optimize_module
+from torch import nn
+
+class MyModel(nn.Module):
+    ...
+
+model = MyModule()
+
+def loss_fn(model):
+    ...
+
+hist = optimize_module(model, loss_fn, opt_method="bfgs", ls_method="back_tracking")
+```
+
+2. The functional interface:
+
+```python
+from gradoptorch import optimizer
+
+def f(x):
+    ...
+
+x_guess = ...
+
+x_opt, hist = optimizer(f, x_guess, opt_method="conj_grad_pr", ls_method="quad_search")
+```
+
+Newton's method is only available in the functional interface
 
 ### Included optimizers:
 
@@ -44,9 +78,3 @@ pip install gradoptorch
     'back_tracking' : backing tracking based line-search
     'quad_search' : quadratic line-search
     'constant' : no line search, constant step size used
-
-## Setup
-
-```bash
-pip install git+https://github.com/coursekevin/gradoptorch.git
-```

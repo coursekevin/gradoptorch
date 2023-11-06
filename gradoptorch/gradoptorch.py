@@ -48,7 +48,7 @@ def column_vec_fn(
 def optimizer(
     f: Callable[[Float[Tensor, " d"]], Float[Tensor, ""]],
     x_guess: Float[Tensor, " d"],
-    g: Optional[Callable[[Float[Tensor, " d"]], Float[Tensor, ""]]] = None,
+    g: Optional[Callable[[Float[Tensor, " d"]], Float[Tensor, " d"]]] = None,
     opt_method: str = "conj_grad_pr",
     opt_params: dict[str, Any] = default_opt_settings,
     ls_method: str = "back_tracking",
