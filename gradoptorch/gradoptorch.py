@@ -1,11 +1,61 @@
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
+
 import torch
+from torch.func import grad, hessian  # type: ignore
+from torch import Tensor
+from jaxtyping import Float
+
 from .lstorch import line_search
 
+default_opt_settings = {
+    "ep_g": 1e-8,
+    "ep_a": 1e-6,
+    "ep_r": 1e-2,
+    "iter_lim": 1000,
+    "restart_iter": 50,  # for conjugate gradient methods gradient stability
+    "Hessian": None,
+}
+default_ls_settings = {
+    "alf": 0.9,
+    "rho": 0.5,
+    "mu": 1e-4,
+    "iter_lim": 1000,
+    "alf_lower_coeff": 0.1,
+    "alf_upper_coeff": 2.0,
+}
 
-def gradoptorch(f, g, x_guess, opt_method='grad_exact', opt_params={'ep_g': 1e-8, 'ep_a': 1e-6, 'ep_r': 1e-2, 'iter_lim': 1000}, ls_method='back_tracking', ls_params={'rho': 0.3, 'mu': 1e-4,  'iter_lim': 1000}):
+
+@dataclass
+class OptimLog:
+    f_opt: Float[Tensor, ""] | None
+    x_hist: list[Float[Tensor, "d"]] | None
+    f_hist: list[Float[Tensor, ""]] | None
+    converge: bool
+    message: str | None
+
+
+def column_vec_fn(
+    grad: Callable[[Float[Tensor, " 1"]], Float[Tensor, ""]]
+) -> Callable[[Float[Tensor, "d 1"]], Float[Tensor, ""]]:
+    def grad_fn(x: Float[Tensor, " d"]) -> Float[Tensor, "d 1"]:
+        return grad(x.view(-1)).view(-1, 1)
+
+    return grad_fn
+
+
+@torch.no_grad()
+def optimizer(
+    f: Callable[[Float[Tensor, " d"]], Float[Tensor, ""]],
+    x_guess: Float[Tensor, " d"],
+    g: Optional[Callable[[Float[Tensor, " d"]], Float[Tensor, ""]]] = None,
+    opt_method: str = "conj_grad_pr",
+    opt_params: dict[str, Any] = default_opt_settings,
+    ls_method: str = "back_tracking",
+    ls_params: dict[str, Any] = default_ls_settings,
+) -> tuple[Float[Tensor, " d"], OptimLog]:
     """
     This function performs gradient based optimization for an objective function "f" using pytorch.
-    Noteably this function allows the user to input a gradient and Hessian function for use in optimization
 
     INPUTS:
         f < function > : objective function f(x) -> f
@@ -44,36 +94,42 @@ def gradoptorch(f, g, x_guess, opt_method='grad_exact', opt_params={'ep_g': 1e-8
         'newton_exact' : exact newton optimization
         'bfgs' : approximate newton optimization using bfgs
     """
+    if g is None:
+        g = grad(f)
+    # g = column_vec_fn(g)
     if opt_method == "grad_exact":
         # optimizes f using an explicit expression for the gradient
         x_opt, f_opt, x_hist, f_hist, converge, message = grad_exact(
-            f, g, x_guess, opt_params, ls_method, ls_params)
+            f, g, x_guess, opt_params, ls_method, ls_params
+        )
     elif opt_method == "conj_grad_fr":
         # optimizes f using Fletcher-Reeves conj. gradient
         x_opt, f_opt, x_hist, f_hist, converge, message = conj_grad_fr(
-            f, g, x_guess, opt_params, ls_method, ls_params)
+            f, g, x_guess, opt_params, ls_method, ls_params
+        )
     elif opt_method == "conj_grad_pr":
         # optimizes f using Polak-Ribiere conj. gradient
         x_opt, f_opt, x_hist, f_hist, converge, message = conj_grad_pr(
-            f, g, x_guess, opt_params, ls_method, ls_params)
+            f, g, x_guess, opt_params, ls_method, ls_params
+        )
     elif opt_method == "newton_exact":
         # optimizes f using Newton's Method (requires Hess be defined)
         x_opt, f_opt, x_hist, f_hist, converge, message = newton_exact(
-            f, g, x_guess, opt_params, ls_method, ls_params)
+            f, g, x_guess, opt_params, ls_method, ls_params
+        )
     elif opt_method == "bfgs":
         # optimizes f using the BFGS method
         x_opt, f_opt, x_hist, f_hist, converge, message = bfgs(
-            f, g, x_guess, opt_params, ls_method, ls_params)
+            f, g, x_guess, opt_params, ls_method, ls_params
+        )
 
     else:
-        x_opt = x_guess
-        f_opt = None
-        x_hist = None
-        f_hist = None
-        converge = False
-        message = "Valid optimization method not chosen"
+        raise ValueError("Optimization method %s not recognized." % opt_method)
 
-    return x_opt, f_opt, x_hist, f_hist, converge, message
+    optimizer_log = OptimLog(
+        f_opt=f_opt, x_hist=x_hist, f_hist=f_hist, converge=converge, message=message
+    )
+    return x_opt, optimizer_log
 
 
 def grad_exact(f, g, x_guess, opt_params, ls_method, ls_params):
@@ -93,10 +149,10 @@ def grad_exact(f, g, x_guess, opt_params, ls_method, ls_params):
         ls_method < str > : indicates which method to use with line search
         ls_params < dict > : dictionary with parameters to use for line search
     """
-    ep_g = opt_params['ep_g']
-    ep_a = opt_params['ep_a']
-    ep_r = opt_params['ep_r']
-    iter_lim = opt_params['iter_lim']
+    ep_g = opt_params["ep_g"]
+    ep_a = opt_params["ep_a"]
+    ep_r = opt_params["ep_r"]
+    iter_lim = opt_params["iter_lim"]
 
     # initializations
     x_k = x_guess
@@ -125,8 +181,9 @@ def grad_exact(f, g, x_guess, opt_params, ls_method, ls_params):
         p_k = -g_k
 
         # perform line search
-        alf, ls_converge, ls_message = line_search(f, x_k, g_k, p_k,
-                                                   ls_method=ls_method, ls_params=ls_params)
+        alf, ls_converge, ls_message = line_search(
+            f, x_k, g_k, p_k, ls_method=ls_method, ls_params=ls_params
+        )
         if not ls_converge:
             converge = ls_converge
             message = ls_message
@@ -175,10 +232,10 @@ def conj_grad_fr(f, g, x_guess, opt_params, ls_method, ls_params):
         ls_method < str > : indicates which method to use with line search
         ls_params < dict > : dictionary with parameters to use for line search
     """
-    ep_g = opt_params['ep_g']
-    ep_a = opt_params['ep_a']
-    ep_r = opt_params['ep_r']
-    iter_lim = opt_params['iter_lim']
+    ep_g = opt_params["ep_g"]
+    ep_a = opt_params["ep_a"]
+    ep_r = opt_params["ep_r"]
+    iter_lim = opt_params["iter_lim"]
 
     # initializations
     x_k = x_guess
@@ -195,7 +252,7 @@ def conj_grad_fr(f, g, x_guess, opt_params, ls_method, ls_params):
 
     # set restart count
     restart_count = 0
-    restart_iter = opt_params['restart_iter']
+    restart_iter = opt_params["restart_iter"]
 
     # how many iterations for rel. abs. tolerance met before stopping
     conv_count_max = 2
@@ -210,8 +267,9 @@ def conj_grad_fr(f, g, x_guess, opt_params, ls_method, ls_params):
             break
 
         # perform line search
-        alf, ls_converge, ls_message = line_search(f, x_k, g_k, p_k,
-                                                   ls_method=ls_method, ls_params=ls_params)
+        alf, ls_converge, ls_message = line_search(
+            f, x_k, g_k, p_k, ls_method=ls_method, ls_params=ls_params
+        )
         if not ls_converge:
             converge = ls_converge
             message = ls_message
@@ -249,10 +307,10 @@ def conj_grad_fr(f, g, x_guess, opt_params, ls_method, ls_params):
         if restart_iter == restart_count:
             restart_count = 0
             beta_k = 0
-            p_k = -g_k/g_k_norm
+            p_k = -g_k / g_k_norm
         else:
             restart_count += 1
-            p_k = -g_k + beta_k*p_k
+            p_k = -g_k + beta_k * p_k
 
     if k == iter_lim:
         converge = False
@@ -279,10 +337,10 @@ def conj_grad_pr(f, g, x_guess, opt_params, ls_method, ls_params):
         ls_method < str > : indicates which method to use with line search
         ls_params < dict > : dictionary with parameters to use for line search
     """
-    ep_g = opt_params['ep_g']
-    ep_a = opt_params['ep_a']
-    ep_r = opt_params['ep_r']
-    iter_lim = opt_params['iter_lim']
+    ep_g = opt_params["ep_g"]
+    ep_a = opt_params["ep_a"]
+    ep_r = opt_params["ep_r"]
+    iter_lim = opt_params["iter_lim"]
 
     # initializations
     x_k = x_guess
@@ -299,7 +357,7 @@ def conj_grad_pr(f, g, x_guess, opt_params, ls_method, ls_params):
 
     # set restart count
     restart_count = 0
-    restart_iter = opt_params['restart_iter']
+    restart_iter = opt_params["restart_iter"]
 
     # how many iterations for rel. abs. tolerance met before stopping
     conv_count_max = 2
@@ -314,8 +372,9 @@ def conj_grad_pr(f, g, x_guess, opt_params, ls_method, ls_params):
             break
 
         # perform line search
-        alf, ls_converge, ls_message = line_search(f, x_k, g_k, p_k,
-                                                   ls_method=ls_method, ls_params=ls_params)
+        alf, ls_converge, ls_message = line_search(
+            f, x_k, g_k, p_k, ls_method=ls_method, ls_params=ls_params
+        )
         if not ls_converge:
             converge = ls_converge
             message = ls_message
@@ -353,10 +412,10 @@ def conj_grad_pr(f, g, x_guess, opt_params, ls_method, ls_params):
         if restart_iter == restart_count:
             restart_count = 0
             beta_k = 0
-            p_k = -g_k/g_k_norm
+            p_k = -g_k / g_k_norm
         else:
             restart_count += 1
-            p_k = -g_k + beta_k*p_k
+            p_k = -g_k + beta_k * p_k
 
     if k == iter_lim:
         converge = False
@@ -383,11 +442,13 @@ def newton_exact(f, g, x_guess, opt_params, ls_method, ls_params):
         ls_method < str > : indicates which method to use with line search
         ls_params < dict > : dictionary with parameters to use for line search
     """
-    ep_g = opt_params['ep_g']
-    ep_a = opt_params['ep_a']
-    ep_r = opt_params['ep_r']
-    H = opt_params['Hessian']
-    iter_lim = opt_params['iter_lim']
+    ep_g = opt_params["ep_g"]
+    ep_a = opt_params["ep_a"]
+    ep_r = opt_params["ep_r"]
+    H = opt_params["Hessian"]
+    if H is None:
+        H = hessian(f)
+    iter_lim = opt_params["iter_lim"]
 
     # initializations
     x_k = x_guess
@@ -414,17 +475,10 @@ def newton_exact(f, g, x_guess, opt_params, ls_method, ls_params):
 
         # invert Hessian and find search direction
         H_k = H(x_k)
-        H_LU, pivots, infos = torch.lu(H_k.reshape(
-            [1, H_k.shape[0], -1]), get_infos=True)
-
-        if infos.nonzero().size(0) != 0:
-            # check if LU factorization failed
-            converge = False
-            message = "Hessian LU factorization failed."
-            break
+        H_LU, pivots = torch.linalg.lu_factor(H_k)
 
         # LU solve is designed for batch operations, hence the [0]
-        delta_k = torch.lu_solve(-g_k.unsqueeze(0), H_LU, pivots)[0]
+        delta_k = torch.linalg.lu_solve(H_LU, pivots, -g_k.view(-1, 1)).view(-1)
 
         if torch.matmul(delta_k.t(), g_k) < 0:
             p_k = delta_k
@@ -432,8 +486,9 @@ def newton_exact(f, g, x_guess, opt_params, ls_method, ls_params):
             p_k = -delta_k
 
         # perform line search
-        alf, ls_converge, ls_message = line_search(f, x_k, g_k, p_k,
-                                                   ls_method=ls_method, ls_params=ls_params)
+        alf, ls_converge, ls_message = line_search(
+            f, x_k, g_k, p_k, ls_method=ls_method, ls_params=ls_params
+        )
         if not ls_converge:
             converge = ls_converge
             message = ls_message
@@ -466,7 +521,7 @@ def newton_exact(f, g, x_guess, opt_params, ls_method, ls_params):
 
 def bfgs(f, g, x_guess, opt_params, ls_method, ls_params):
     """
-    This function performs Quasi-Newton gradient descent using the Broyden-Fletcher-Goldfarb-Shanno 
+    This function performs Quasi-Newton gradient descent using the Broyden-Fletcher-Goldfarb-Shanno
     approximation for the Hessian
 
     INPUTS:
@@ -482,10 +537,10 @@ def bfgs(f, g, x_guess, opt_params, ls_method, ls_params):
         ls_method < str > : indicates which method to use with line search
         ls_params < dict > : dictionary with parameters to use for line search
     """
-    ep_g = opt_params['ep_g']
-    ep_a = opt_params['ep_a']
-    ep_r = opt_params['ep_r']
-    iter_lim = opt_params['iter_lim']
+    ep_g = opt_params["ep_g"]
+    ep_a = opt_params["ep_a"]
+    ep_r = opt_params["ep_r"]
+    iter_lim = opt_params["iter_lim"]
 
     # initializations
     x_k = x_guess
@@ -516,8 +571,9 @@ def bfgs(f, g, x_guess, opt_params, ls_method, ls_params):
         p_k = torch.matmul(B_k_inv, -g_k)
 
         # perform line search
-        alf, ls_converge, ls_message = line_search(f, x_k, g_k, p_k,
-                                                   ls_method=ls_method, ls_params=ls_params)
+        alf, ls_converge, ls_message = line_search(
+            f, x_k, g_k, p_k, ls_method=ls_method, ls_params=ls_params
+        )
         if not ls_converge:
             converge = ls_converge
             message = ls_message
@@ -545,12 +601,13 @@ def bfgs(f, g, x_guess, opt_params, ls_method, ls_params):
         # compute gradient
         g_k1 = g(x_k)
 
-        s_k = alf*p_k
+        s_k = alf * p_k
         y_k = g_k1 - g_k
 
-        tmp_mat = I - torch.matmul(s_k, y_k.t())/torch.matmul(s_k.t(), y_k)
-        B_k_inv = torch.matmul(torch.matmul(tmp_mat, B_k_inv), tmp_mat) + \
-            torch.matmul(s_k, s_k.t())/torch.matmul(s_k.t(), y_k)
+        tmp_mat = I - torch.matmul(s_k, y_k.t()) / torch.matmul(s_k.t(), y_k)
+        B_k_inv = torch.matmul(torch.matmul(tmp_mat, B_k_inv), tmp_mat) + torch.matmul(
+            s_k, s_k.t()
+        ) / torch.matmul(s_k.t(), y_k)
 
         g_k = g_k1
 
@@ -575,7 +632,7 @@ def search_step(f, x_k, alf, p_k):
         x_(k+1) < tensor > : new best guess for f(x) minimum
         f_(k+1) < tensor > : function evaluated at new best guess
     """
-    x_k1 = x_k + alf*p_k
+    x_k1 = x_k + alf * p_k
     f_k1 = f(x_k1)
     return x_k1, f_k1
 
@@ -595,7 +652,7 @@ def rel_abs_convergence(f_k, f_k1, ep_a, ep_r):
         rel/abs convergence < bool > : bool indicating whether rel/abs criterion was met
     """
     LHS = torch.abs(f_k1 - f_k)
-    RHS = ep_a + ep_r*torch.abs(f_k)
+    RHS = ep_a + ep_r * torch.abs(f_k)
 
     return torch.gt(RHS, LHS)
 

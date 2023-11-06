@@ -1,7 +1,14 @@
 import torch
 
 
-def line_search(f, x_k, g_k, p_k, ls_method='back_tracking', ls_params={'alf': 1, 'rho': 0.3, 'mu': 1e-4,  'iter_lim': 1000}):
+def line_search(
+    f,
+    x_k,
+    g_k,
+    p_k,
+    ls_method="back_tracking",
+    ls_params={"alf": 1, "rho": 0.3, "mu": 1e-4, "iter_lim": 1000},
+):
     """
     This function performs line search for an objective function "f" using pytorch
 
@@ -28,18 +35,19 @@ def line_search(f, x_k, g_k, p_k, ls_method='back_tracking', ls_params={'alf': 1
         converge < bool > : bool indicating whether line search converged
         message < string > : string with output from line_search method
     """
-    if ls_method == 'back_tracking':
-        alf_new, converge, message = back_tracking(
-            f, x_k, g_k, p_k, ls_params)
+    if ls_method == "back_tracking":
+        alf_new, converge, message = back_tracking(f, x_k, g_k, p_k, ls_params)
 
-    elif ls_method == 'quad_search':
-        alf_new, converge, message = quad_search(
-            f, x_k, g_k, p_k, ls_params)
+    elif ls_method == "quad_search":
+        alf_new, converge, message = quad_search(f, x_k, g_k, p_k, ls_params)
 
-    elif ls_method == 'constant':
-        alf_new = ls_params['alf']
+    elif ls_method == "constant":
+        alf_new = ls_params["alf"]
         converge = True
-        message = 'Constant steps size chosen, no backtracking required.'
+        message = "Constant steps size chosen, no backtracking required."
+
+    else:
+        raise ValueError("ls_method %s not recognized." % ls_method)
     return alf_new, converge, message
 
 
@@ -86,11 +94,11 @@ def back_tracking(f, x_k, g_k, p_k, ls_params):
         converge < bool > : bool indicating whether line search converged
         message < string > : string with output from back tracking method
     """
-    alf = ls_params['alf']
-    rho = ls_params['rho']
-    mu = ls_params['mu']
-    iter_lim = ls_params['iter_lim']
-    alf_new = ls_params['alf']
+    alf = ls_params["alf"]
+    rho = ls_params["rho"]
+    mu = ls_params["mu"]
+    iter_lim = ls_params["iter_lim"]
+    alf_new = ls_params["alf"]
     iter = 0
     while not armijo_suff_decrease(f, x_k, g_k, p_k, alf_new, mu) and iter < iter_lim:
         alf_new = rho * alf_new
@@ -130,37 +138,33 @@ def quad_search(f, x_k, g_k, p_k, ls_params):
         converge < bool > : bool indicating whether line search converged
         message < string > : string with output from back tracking method
     """
-    mu = ls_params['mu']
-    iter_lim = ls_params['iter_lim']
-    alf_new = ls_params['alf']
-    alf_coeff1 = ls_params['alf_lower_coeff']
-    alf_coeff2 = ls_params['alf_upper_coeff']
+    mu = ls_params["mu"]
+    iter_lim = ls_params["iter_lim"]
+    alf_new = ls_params["alf"]
+    alf_coeff1 = ls_params["alf_lower_coeff"]
+    alf_coeff2 = ls_params["alf_upper_coeff"]
     iter = 0
     while not armijo_suff_decrease(f, x_k, g_k, p_k, alf_new, mu) and iter < iter_lim:
         a1 = alf_new
-        a2 = alf_new*0.1
-        a3 = alf_new*2.0
-        f1 = f(x_k + a1*p_k)
-        f2 = f(x_k + a2*p_k)
-        f3 = f(x_k + a3*p_k)
+        a2 = alf_new * 0.1
+        a3 = alf_new * 2.0
+        f1 = f(x_k + a1 * p_k)
+        f2 = f(x_k + a2 * p_k)
+        f3 = f(x_k + a3 * p_k)
 
-        A = torch.tensor([
-            [1/2*a1.pow(2), a1, 1],
-            [1/2*a2.pow(2), a2, 1],
-            [1/2*a3.pow(2), a3, 1]
-        ])
+        A = torch.tensor(
+            [
+                [1 / 2 * (a1**2), a1, 1],
+                [1 / 2 * (a2**2), a2, 1],
+                [1 / 2 * (a3**2), a3, 1],
+            ]
+        )
         b = torch.tensor([[f1], [f2], [f3]])
 
-        A_LU, pivots, infos = torch.lu(
-            A.reshape([1, A.shape[0], -1]), get_infos=True)
+        A_LU, pivots = torch.linalg.lu_factor(A)
 
-        if infos.nonzero().size(0) != 0:
-            converge = False
-            message = "Quadratic approx was not possible."
-            break
-
-        coeff = torch.lu_solve(b.unsqueeze(0), A_LU, pivots)[0]
-        alf_new = -coeff[1]/coeff[0]
+        coeff = torch.linalg.lu_solve(A_LU, pivots, b.view(-1, 1)).view(-1)
+        alf_new = -coeff[1] / coeff[0]
         iter += 1
 
     if iter == iter_lim:

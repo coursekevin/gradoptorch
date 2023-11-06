@@ -9,7 +9,11 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 torch = "^2.1.0"
+jaxtyping = "^0.2.23"
 
+
+[tool.poetry.group.dev.dependencies]
+matplotlib = "^3.8.1"
 
 [build-system]
 requires = ["poetry-core"]
