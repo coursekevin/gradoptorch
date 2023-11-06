@@ -17,7 +17,7 @@ methods for line-search.
 
 ## Why not [torch.optim](https://pytorch.org/docs/stable/optim.html)?
 
-Not every problem is high-dimensional, nonlinear, with noisy gradients.  
+Not every problem is high-dimensional, highly nonconvex, with noisy gradients.  
 For such problems, classical optimization techniques
 can be more efficient.
 
