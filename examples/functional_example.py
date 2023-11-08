@@ -25,6 +25,7 @@ def main():
         x = torch.tensor([-0.5, 3.0])
         # using quadratic line search
         x_opt, hist = optimizer(f, x, opt_method=method, ls_method="quad_search")
+        print(f"{method}: {hist.message}")
         histories.append(hist)
 
     # ---------------------------------------------------------------------------------
