@@ -11,7 +11,7 @@ from .lstorch import line_search
 default_opt_settings = {
     "ep_g": 1e-8,
     "ep_a": 1e-6,
-    "ep_r": 1e-2,
+    "ep_r": 1e-4,
     "iter_lim": 1000,
     "restart_iter": 50,  # for conjugate gradient methods gradient stability
     "Hessian": None,
@@ -195,6 +195,8 @@ def grad_exact(f, g, x_guess, opt_params, ls_method, ls_params):
         # check relative and absolute convergence criteria
         if rel_abs_convergence(f_k, f_k1, ep_a, ep_r):
             conv_count += 1
+        else:
+            conv_count = 0
 
         x_k = x_k1
         f_k = f_k1
@@ -281,6 +283,8 @@ def conj_grad_fr(f, g, x_guess, opt_params, ls_method, ls_params):
         # check relative and absolute convergence criteria
         if rel_abs_convergence(f_k, f_k1, ep_a, ep_r):
             conv_count += 1
+        else:
+            conv_count = 0
 
         x_k = x_k1
         f_k = f_k1
@@ -386,6 +390,8 @@ def conj_grad_pr(f, g, x_guess, opt_params, ls_method, ls_params):
         # check relative and absolute convergence criteria
         if rel_abs_convergence(f_k, f_k1, ep_a, ep_r):
             conv_count += 1
+        else:
+            conv_count = 0 
 
         x_k = x_k1
         f_k = f_k1
@@ -500,6 +506,8 @@ def newton_exact(f, g, x_guess, opt_params, ls_method, ls_params):
         # check relative and absolute convergence criteria
         if rel_abs_convergence(f_k, f_k1, ep_a, ep_r):
             conv_count += 1
+        else:
+            conv_count = 0
 
         x_k = x_k1
         f_k = f_k1
@@ -585,6 +593,8 @@ def bfgs(f, g, x_guess, opt_params, ls_method, ls_params):
         # check relative and absolute convergence criteria
         if rel_abs_convergence(f_k, f_k1, ep_a, ep_r):
             conv_count += 1
+        else:
+            conv_count = 0
 
         x_k = x_k1
         f_k = f_k1

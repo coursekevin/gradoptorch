@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gradoptorch"
-version = "0.1.0"
+version = "0.1.1"
 description = "Classical gradient based optimization in PyTorch"
 authors = ["Kevin Course <kevin.course@mail.utoronto.ca>"]
 license = "GNUv3"
